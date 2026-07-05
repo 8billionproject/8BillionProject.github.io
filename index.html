@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>8 Billion Project — An atlas of everyone</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --space:#080B14;
+    --space-2:#0C1120;
+    --ocean:#0F1B2E;
+    --amber:#F5B841;
+    --amber-soft:#E9A93C;
+    --paper:#F4EFE6;
+    --slate:#8A97AB;
+    --slate-dim:#5A6579;
+    --line:rgba(138,151,171,.16);
+    --panel:rgba(12,17,32,.86);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--space);
+    color:var(--paper);
+    font-family:"Inter",system-ui,sans-serif;
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  /* ambient starfield glow behind globe */
+  body::before{
+    content:"";position:fixed;inset:0;z-index:0;
+    background:
+      radial-gradient(1200px 700px at 68% 52%, rgba(30,58,95,.35), transparent 60%),
+      radial-gradient(900px 600px at 20% 15%, rgba(245,184,65,.05), transparent 55%);
+    pointer-events:none;
+  }
+  #globeViz{position:fixed;inset:0;z-index:1;cursor:grab}
+  #globeViz:active{cursor:grabbing}
+
+  /* ---------- Left rail ---------- */
+  .rail{
+    position:fixed;z-index:5;top:0;left:0;height:100%;
+    width:min(430px,90vw);
+    padding:42px 40px;
+    display:flex;flex-direction:column;
+    justify-content:space-between;
+    background:linear-gradient(90deg, rgba(8,11,20,.92) 0%, rgba(8,11,20,.72) 62%, transparent 100%);
+    pointer-events:none;
+  }
+  .rail > *{pointer-events:auto}
+  .eyebrow{
+    font-family:"IBM Plex Mono",monospace;
+    font-size:11px;letter-spacing:.34em;text-transform:uppercase;
+    color:var(--amber);
+    display:flex;align-items:center;gap:10px;
+  }
+  .eyebrow::before{content:"";width:22px;height:1px;background:var(--amber);display:inline-block;opacity:.8}
+  h1{
+    font-family:"Fraunces",serif;
+    font-weight:500;
+    font-size:clamp(44px,6vw,68px);
+    line-height:.94;
+    letter-spacing:-.015em;
+    margin:22px 0 14px;
+  }
+  h1 em{font-style:italic;color:var(--amber);font-weight:400}
+  .lede{
+    color:var(--slate);
+    font-size:15px;line-height:1.6;max-width:34ch;
+  }
+  /* counter */
+  .counter{margin-top:8px}
+  .counter .num{
+    font-family:"Fraunces",serif;
+    font-weight:600;
+    font-size:clamp(38px,5.2vw,54px);
+    letter-spacing:-.02em;
+    line-height:1;
+    color:var(--paper);
+    font-variant-numeric:tabular-nums;
+  }
+  .counter .of{
+    font-family:"IBM Plex Mono",monospace;
+    font-size:12px;letter-spacing:.12em;
+    color:var(--slate-dim);
+    margin-top:9px;
+  }
+  .counter .of b{color:var(--slate);font-weight:500}
+  .hint{
+    font-family:"IBM Plex Mono",monospace;
+    font-size:11.5px;letter-spacing:.05em;
+    color:var(--slate-dim);
+    display:flex;align-items:center;gap:9px;
+  }
+  .hint .dot{width:7px;height:7px;border-radius:50%;background:var(--amber);
+    box-shadow:0 0 0 4px rgba(245,184,65,.15);animation:pulse 2.4s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+  /* ---------- City panel ---------- */
+  .panel{
+    position:fixed;z-index:6;top:0;right:0;height:100%;
+    width:min(500px,95vw);
+    background:var(--panel);
+    backdrop-filter:blur(14px);
+    border-left:1px solid var(--line);
+    transform:translateX(102%);
+    transition:transform .55s cubic-bezier(.16,1,.3,1);
+    display:flex;flex-direction:column;
+  }
+  .panel.open{transform:translateX(0)}
+  .panel-head{padding:34px 36px 22px;border-bottom:1px solid var(--line);position:relative}
+  .panel-close{
+    position:absolute;top:30px;right:32px;
+    background:none;border:1px solid var(--line);color:var(--slate);
+    width:34px;height:34px;border-radius:50%;cursor:pointer;
+    font-size:17px;line-height:1;transition:.2s;
+  }
+  .panel-close:hover{border-color:var(--amber);color:var(--amber)}
+  .panel-coord{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.14em;color:var(--amber);text-transform:uppercase}
+  .panel-city{font-family:"Fraunces",serif;font-weight:500;font-size:34px;letter-spacing:-.01em;margin:8px 0 3px}
+  .panel-country{color:var(--slate);font-size:14px}
+  .panel-meta{
+    margin-top:18px;display:flex;gap:26px;
+    font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.06em;color:var(--slate-dim);text-transform:uppercase;
+  }
+  .panel-meta b{display:block;font-family:"Fraunces",serif;font-size:26px;letter-spacing:0;color:var(--paper);text-transform:none;font-weight:600;margin-bottom:2px}
+  .panel-sub{padding:16px 36px 8px;font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--slate-dim)}
+  .grid{
+    flex:1;overflow-y:auto;padding:6px 30px 40px;
+    display:grid;grid-template-columns:repeat(2,1fr);gap:16px;align-content:start;
+  }
+  .grid::-webkit-scrollbar{width:8px}
+  .grid::-webkit-scrollbar-thumb{background:var(--slate-dim);border-radius:8px;border:2px solid var(--panel)}
+  .card{opacity:0;transform:translateY(10px);animation:rise .5s forwards}
+  @keyframes rise{to{opacity:1;transform:none}}
+  .portrait{
+    aspect-ratio:3/4;border-radius:10px;overflow:hidden;position:relative;
+    display:flex;align-items:center;justify-content:center;
+    border:1px solid var(--line);
+  }
+  .portrait .mono{
+    font-family:"Fraunces",serif;font-size:34px;font-weight:500;color:rgba(244,239,230,.9);
+    letter-spacing:.02em;
+  }
+  .idx{
+    position:absolute;top:8px;left:9px;
+    font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.05em;
+    color:rgba(244,239,230,.75);background:rgba(8,11,20,.55);
+    padding:2px 6px;border-radius:5px;
+  }
+  .card .name{margin-top:9px;font-size:13.5px;font-weight:500;line-height:1.25}
+  .card .year{margin-top:2px;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--slate);letter-spacing:.04em}
+
+  /* footer credit */
+  .credit{
+    position:fixed;z-index:5;bottom:20px;right:26px;
+    font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--slate-dim);
+    text-align:right;line-height:1.7;pointer-events:none;
+  }
+  .credit b{color:var(--slate);font-weight:400}
+
+  @media (max-width:720px){
+    .rail{width:100%;background:linear-gradient(180deg,rgba(8,11,20,.94),rgba(8,11,20,.4) 70%,transparent);height:auto;padding:30px 26px 40px}
+    .rail{justify-content:flex-start;gap:24px}
+    .credit{display:none}
+    .grid{grid-template-columns:repeat(2,1fr)}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{animation-duration:.001ms !important;transition-duration:.15s !important}
+  }
+</style>
+</head>
+<body>
+  <div id="globeViz"></div>
+
+  <div class="rail">
+    <div>
+      <div class="eyebrow">An atlas of everyone</div>
+      <h1>8&nbsp;Billion<br /><em>Project</em></h1>
+      <p class="lede">One planet, one portrait at a time. Every face is captured and placed in the order they were born — city by city, life by life.</p>
+    </div>
+
+    <div class="counter">
+      <div class="num" id="count">0</div>
+      <div class="of">of <b>8,000,000,000</b> · people photographed so far</div>
+    </div>
+
+    <div class="hint"><span class="dot"></span>Click a glowing city to meet its people</div>
+  </div>
+
+  <aside class="panel" id="panel">
+    <div class="panel-head">
+      <button class="panel-close" id="close" aria-label="Close">×</button>
+      <div class="panel-coord" id="pCoord">—</div>
+      <div class="panel-city" id="pCity">—</div>
+      <div class="panel-country" id="pCountry">—</div>
+      <div class="panel-meta">
+        <div><b id="pCount">0</b>portraits</div>
+        <div><b id="pSpan">—</b>birth years</div>
+      </div>
+    </div>
+    <div class="panel-sub">In order of birth · oldest first</div>
+    <div class="grid" id="grid"></div>
+  </aside>
+
+  <div class="credit"><b>8 Billion Project</b><br />Prototype · sample data</div>
+
+  <script src="https://unpkg.com/globe.gl"></script>
+  <script>
+  /* ----------------------------------------------------------
+     SAMPLE DATA
+     Replace this block with a live fetch from Supabase later.
+     Each city: name, country, lat, lng, and its people.
+     People are generated deterministically just for the demo.
+  ---------------------------------------------------------- */
+  const NAME_POOL = {
+    it:{f:["Luca","Giulia","Marco","Sofia","Alessandro","Chiara","Matteo","Elena","Francesco","Aurora"],l:["Rossi","Ferrari","Esposito","Bianchi","Romano","Colombo","Ricci","Greco","Conti","Costa"]},
+    de:{f:["Lukas","Hannah","Felix","Emma","Jonas","Mia","Paul","Lena","Finn","Clara"],l:["Müller","Schmidt","Weber","Wagner","Becker","Hoffmann","Schulz","Koch","Richter","Klein"]},
+    jp:{f:["Haruto","Yui","Sota","Aoi","Ren","Sakura","Yuto","Hina","Riku","Mio"],l:["Sato","Suzuki","Takahashi","Tanaka","Watanabe","Ito","Yamamoto","Nakamura","Kobayashi","Kato"]},
+    br:{f:["Miguel","Helena","Arthur","Alice","Bernardo","Laura","Davi","Manuela","Théo","Valentina"],l:["Silva","Santos","Oliveira","Souza","Lima","Pereira","Costa","Rodrigues","Almeida","Ferreira"]},
+    ng:{f:["Chidi","Amara","Emeka","Zainab","Tunde","Ngozi","Ifeanyi","Adaeze","Obi","Funke"],l:["Okafor","Adeyemi","Balogun","Okonkwo","Eze","Abubakar","Nwosu","Bello","Chukwu","Ogun"]},
+    us:{f:["James","Olivia","Noah","Ava","Liam","Sophia","Ethan","Isabella","Mason","Charlotte"],l:["Johnson","Williams","Brown","Jones","Garcia","Miller","Davis","Martinez","Lee","Nguyen"]},
+    in:{f:["Aarav","Diya","Vivaan","Ananya","Aditya","Ishani","Reyansh","Saanvi","Arjun","Myra"],l:["Sharma","Patel","Iyer","Reddy","Nair","Gupta","Rao","Mehta","Das","Kapoor"]},
+    fr:{f:["Gabriel","Louise","Raphaël","Emma","Louis","Jade","Arthur","Alice","Hugo","Chloé"],l:["Martin","Bernard","Dubois","Thomas","Robert","Petit","Durand","Leroy","Moreau","Simon"]},
+  };
+  const CITIES = [
+    {name:"Berlin", country:"Germany",     lat:52.52,  lng:13.405, pool:"de", seed:12, base:342},
+    {name:"Roma",   country:"Italy",       lat:41.902, lng:12.496, pool:"it", seed:7,  base:511},
+    {name:"Tōkyō",  country:"Japan",       lat:35.676, lng:139.65, pool:"jp", seed:31, base:288},
+    {name:"São Paulo",country:"Brazil",    lat:-23.55, lng:-46.63, pool:"br", seed:19, base:463},
+    {name:"Lagos",  country:"Nigeria",     lat:6.524,  lng:3.379,  pool:"ng", seed:44, base:377},
+    {name:"New York",country:"USA",        lat:40.712, lng:-74.006,pool:"us", seed:5,  base:604},
+    {name:"Mumbai", country:"India",       lat:19.076, lng:72.877, pool:"in", seed:23, base:559},
+    {name:"Paris",  country:"France",      lat:48.856, lng:2.352,  pool:"fr", seed:9,  base:420},
+  ];
+
+  // small deterministic RNG so the demo is stable
+  function rng(seed){let s=seed*9301+49297;return()=>{s=(s*9301+49297)%233280;return s/233280;}}
+  const YEAR_NOW=2007; // youngest allowed (18+)
+  function buildPeople(city){
+    const r=rng(city.seed*97+city.base);
+    const pool=NAME_POOL[city.pool];
+    const n=18+Math.floor(r()*22); // 18–40 portraits in demo
+    const arr=[];
+    for(let i=0;i<n;i++){
+      const f=pool.f[Math.floor(r()*pool.f.length)];
+      const l=pool.l[Math.floor(r()*pool.l.length)];
+      const year=1938+Math.floor(r()*(YEAR_NOW-1938));
+      arr.push({first:f,last:l,year});
+    }
+    arr.sort((a,b)=>a.year-b.year); // in order of birth
+    return arr;
+  }
+  CITIES.forEach(c=>c.people=buildPeople(c));
+
+  const TOTAL = CITIES.reduce((s,c)=>s+c.people.length,0);
+
+  /* ---------- Globe ---------- */
+  const globe = Globe()
+    (document.getElementById('globeViz'))
+    .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-night.jpg')
+    .backgroundColor('rgba(0,0,0,0)')
+    .showAtmosphere(true)
+    .atmosphereColor('#F5B841')
+    .atmosphereAltitude(0.18)
+    .pointsData(CITIES)
+    .pointLat('lat').pointLng('lng')
+    .pointColor(()=> '#F5B841')
+    .pointAltitude(d=> 0.02 + d.people.length/900)
+    .pointRadius(0.55)
+    .pointsMerge(false)
+    .pointLabel(d=> `<div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#F5B841;background:rgba(8,11,20,.9);padding:6px 10px;border-radius:6px;border:1px solid rgba(245,184,65,.3)">${d.name.toUpperCase()} · ${d.people.length}</div>`)
+    .onPointClick(openCity);
+
+  // atmosphere / rings for a soft glow on each city
+  globe.ringsData(CITIES)
+    .ringLat('lat').ringLng('lng')
+    .ringColor(()=> t=>`rgba(245,184,65,${1-t})`)
+    .ringMaxRadius(2.2).ringPropagationSpeed(1.1).ringRepeatPeriod(2600);
+
+  const reduce = window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  const controls = globe.controls();
+  controls.autoRotate = !reduce;
+  controls.autoRotateSpeed = 0.35;
+  controls.enableZoom = true;
+  globe.pointOfView({lat:30,lng:10,altitude:2.4},0);
+
+  function resize(){ globe.width(window.innerWidth).height(window.innerHeight); }
+  window.addEventListener('resize',resize); resize();
+
+  /* ---------- Count-up ---------- */
+  (function(){
+    const el=document.getElementById('count');
+    const dur=1600, t0=performance.now();
+    function step(t){
+      const k=Math.min(1,(t-t0)/dur);
+      const e=1-Math.pow(1-k,3);
+      el.textContent=Math.floor(e*TOTAL).toLocaleString('en-US');
+      if(k<1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  })();
+
+  /* ---------- City panel ---------- */
+  const panel=document.getElementById('panel');
+  const grid=document.getElementById('grid');
+  const TILE=['#243B57','#3A3350','#1F4A45','#4A3A2A','#3E2E3E','#2C3E50'];
+
+  function openCity(city){
+    controls.autoRotate=false;
+    globe.pointOfView({lat:city.lat,lng:city.lng,altitude:1.6},900);
+    document.getElementById('pCoord').textContent =
+      `${Math.abs(city.lat).toFixed(2)}°${city.lat>=0?'N':'S'}  ${Math.abs(city.lng).toFixed(2)}°${city.lng>=0?'E':'W'}`;
+    document.getElementById('pCity').textContent = city.name;
+    document.getElementById('pCountry').textContent = city.country;
+    document.getElementById('pCount').textContent = city.people.length;
+    const span = `${city.people[0].year}–${city.people[city.people.length-1].year}`;
+    document.getElementById('pSpan').textContent = span;
+
+    grid.innerHTML='';
+    city.people.forEach((p,i)=>{
+      const initials=(p.first[0]||'')+(p.last[0]||'');
+      const bg=TILE[(i+city.seed)%TILE.length];
+      const card=document.createElement('div');
+      card.className='card';
+      card.style.animationDelay=(i*22)+'ms';
+      card.innerHTML=`
+        <div class="portrait" style="background:linear-gradient(155deg,${bg},#0C1120)">
+          <span class="idx">#${i+1}</span>
+          <span class="mono">${initials}</span>
+        </div>
+        <div class="name">${p.first} ${p.last}</div>
+        <div class="year">b. ${p.year} · ${city.name}</div>`;
+      grid.appendChild(card);
+    });
+    panel.classList.add('open');
+  }
+  function closePanel(){ panel.classList.remove('open'); controls.autoRotate=!reduce; }
+  document.getElementById('close').addEventListener('click',closePanel);
+  window.addEventListener('keydown',e=>{ if(e.key==='Escape') closePanel(); });
+  </script>
+</body>
+</html>
