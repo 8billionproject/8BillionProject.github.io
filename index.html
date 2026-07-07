@@ -7,22 +7,20 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div id="globeViz"></div>
+  <div id="map"></div>
 
-  <div class="rail">
-    <div>
-      <div class="eyebrow">An atlas of everyone</div>
-      <h1>8&nbsp;Billion<br /><em>Project</em></h1>
-      <p class="lede">One planet, one portrait at a time. Every face is captured and placed in the order they were born — city by city, life by life.</p>
-    </div>
+  <!-- Brand + live counter -->
+  <div class="brand">
+    <div class="eyebrow">An atlas of everyone</div>
+    <h1>8&nbsp;Billion <em>Project</em></h1>
     <div class="counter">
-      <div class="num" id="count">0</div>
-      <div class="of">of <b>8,000,000,000</b> · people photographed so far</div>
+      <span class="num" id="count">0</span>
+      <span class="of">of 8,000,000,000 photographed</span>
     </div>
-    <div class="hint"><span class="dot"></span>Search a place, or click a glowing city</div>
   </div>
 
   <!-- Search -->
@@ -50,9 +48,7 @@
     <div class="grid" id="grid"></div>
   </aside>
 
-  <div class="credit"><b>8 Billion Project</b><br />Prototype · sample data</div>
-
-  <script src="https://cdn.jsdelivr.net/npm/globe.gl"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
