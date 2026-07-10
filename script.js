@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------
-   8 BILLION PROJECT — map prototype (Leaflet)
+   8 BILLION PROJECT — globe prototype (MapLibre GL JS)
    SAMPLE DATA below. Replace with a live Supabase fetch later.
 ---------------------------------------------------------- */
 const NAME_POOL = {
@@ -39,37 +39,70 @@ CITIES.forEach(c=>c.people=buildPeople(c));
 const TOTAL = CITIES.reduce((s,c)=>s+c.people.length,0);
 const reduce = window.matchMedia('(prefers-reduced-motion:reduce)').matches;
 
-/* ---------- Map ---------- */
-// Basemap style — swap this URL to change the look:
-//   Voyager (Google-Maps-like, default): rastertiles/voyager
-//   Light minimal:                       light_all
-//   Dark:                                dark_all
-const TILE_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
-
-const map = L.map('map', {
-  center:[30,10], zoom:3, minZoom:2, maxZoom:19,
-  zoomControl:false, worldCopyJump:true, attributionControl:true,
+/* ---------- Map (globe → street) ----------
+   Basemap: CARTO Voyager raster tiles (Google-Maps-like, no API key).
+   Swap "voyager" below for "light_all" or "dark_all" to change the look. */
+const STYLE_NAME = 'rastertiles/voyager';
+const map = new maplibregl.Map({
+  container:'map',
+  center:[12,25], zoom:1.7, minZoom:1, maxZoom:18,
+  attributionControl:true, canvasContextAttributes:{antialias:true},
+  style:{
+    version:8,
+    projection:{type:'globe'},
+    sources:{
+      base:{
+        type:'raster', tileSize:256,
+        tiles:[
+          `https://a.basemaps.cartocdn.com/${STYLE_NAME}/{z}/{x}/{y}@2x.png`,
+          `https://b.basemaps.cartocdn.com/${STYLE_NAME}/{z}/{x}/{y}@2x.png`,
+          `https://c.basemaps.cartocdn.com/${STYLE_NAME}/{z}/{x}/{y}@2x.png`,
+          `https://d.basemaps.cartocdn.com/${STYLE_NAME}/{z}/{x}/{y}@2x.png`,
+        ],
+        attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>',
+      },
+    },
+    layers:[
+      { id:'space', type:'background', paint:{'background-color':'#070b14'} },
+      { id:'base',  type:'raster', source:'base' },
+    ],
+    sky:{ 'atmosphere-blend':['interpolate',['linear'],['zoom'],0,1,5,1,7,0] },
+  },
 });
-L.control.zoom({position:'bottomright'}).addTo(map);
-map.attributionControl.setPosition('bottomleft');
+map.addControl(new maplibregl.NavigationControl({visualizePitch:true}), 'bottom-right');
 
-L.tileLayer(TILE_URL, {
-  detectRetina:true, subdomains:'abcd', maxZoom:19,
-  attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-}).addTo(map);
+/* ---------- Spinning globe ---------- */
+let userInteracting=false, spinEnabled=!reduce;
+const SECONDS_PER_REV=150, MAX_SPIN_ZOOM=5, SLOW_SPIN_ZOOM=3;
+function spinGlobe(){
+  const z=map.getZoom();
+  if(spinEnabled && !userInteracting && z<MAX_SPIN_ZOOM){
+    let dps=360/SECONDS_PER_REV;
+    if(z>SLOW_SPIN_ZOOM) dps *= (MAX_SPIN_ZOOM-z)/(MAX_SPIN_ZOOM-SLOW_SPIN_ZOOM);
+    const c=map.getCenter(); c.lng-=dps;
+    map.easeTo({center:c, duration:1000, easing:n=>n});
+  }
+}
+['mousedown','touchstart','dragstart'].forEach(ev=>map.on(ev,()=>{userInteracting=true;}));
+['mouseup','touchend','dragend'].forEach(ev=>map.on(ev,()=>{userInteracting=false; spinGlobe();}));
+map.on('moveend', spinGlobe);
+map.on('load', ()=>{ spinGlobe(); addMarkers(); });
 
-/* ---------- Dots ---------- */
-const dotIcon = L.divIcon({ className:'', html:'<span class="map-dot"></span>', iconSize:[16,16], iconAnchor:[8,8] });
-CITIES.forEach(c=>{
-  const m = L.marker([c.lat,c.lng], {icon:dotIcon, riseOnHover:true, keyboard:false}).addTo(map);
-  m.bindTooltip(`${c.name} · ${c.people.length}`, {direction:'top', offset:[0,-10], className:'map-tip', opacity:1});
-  m.on('click', ()=>openCity(c));
-  c.marker = m;
-});
+function goTo(c){
+  if(reduce) map.jumpTo({center:[c.lng,c.lat], zoom:13});
+  else map.flyTo({center:[c.lng,c.lat], zoom:13, speed:0.8, curve:1.5, essential:true});
+}
 
-function goTo(lat,lng){
-  if(reduce) map.setView([lat,lng], 12, {animate:false});
-  else map.flyTo([lat,lng], 12, {duration:1.2});
+/* ---------- Dots (markers) ---------- */
+function addMarkers(){
+  CITIES.forEach(c=>{
+    const el=document.createElement('div');
+    el.className='marker';
+    el.innerHTML=`<span class="map-dot"></span><span class="map-tip">${c.name} · ${c.people.length}</span>`;
+    el.addEventListener('click',(e)=>{ e.stopPropagation(); openCity(c); });
+    c.marker = new maplibregl.Marker({element:el, anchor:'center'})
+      .setLngLat([c.lng,c.lat]).addTo(map);
+  });
 }
 
 /* ---------- Count-up ---------- */
@@ -88,7 +121,8 @@ const searchWrap=document.getElementById('searchWrap');
 const TILE=['#243B57','#3A3350','#1F4A45','#4A3A2A','#3E2E3E','#2C3E50'];
 
 function openCity(city){
-  goTo(city.lat, city.lng);
+  spinEnabled=false;
+  goTo(city);
   document.getElementById('pCoord').textContent =
     `${Math.abs(city.lat).toFixed(2)}°${city.lat>=0?'N':'S'}  ${Math.abs(city.lng).toFixed(2)}°${city.lng>=0?'E':'W'}`;
   document.getElementById('pCity').textContent = city.name;
@@ -113,7 +147,12 @@ function openCity(city){
   panel.classList.add('open');
   searchWrap.classList.add('shifted');
 }
-function closePanel(){ panel.classList.remove('open'); searchWrap.classList.remove('shifted'); }
+function closePanel(){
+  panel.classList.remove('open');
+  searchWrap.classList.remove('shifted');
+  spinEnabled=!reduce;
+  if(!reduce) map.flyTo({center:[12,25], zoom:1.7, speed:0.8, essential:true});
+}
 document.getElementById('close').addEventListener('click',closePanel);
 window.addEventListener('keydown',e=>{ if(e.key==='Escape' && panel.classList.contains('open')) closePanel(); });
 
@@ -122,7 +161,7 @@ const input=document.getElementById('search'), results=document.getElementById('
 const norm=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
 let matches=[], active=-1;
 
-function query(q){
+function queryPlaces(q){
   if(!q) return [];
   return CITIES.filter(c=> norm(c.name).includes(q) || norm(c.country).includes(q)).slice(0,6);
 }
@@ -141,8 +180,8 @@ function render(){
 }
 function pick(city){ input.value=city.name; matches=[]; active=-1; render(); openCity(city); input.blur(); }
 
-input.addEventListener('input',()=>{ matches=query(norm(input.value)); active=-1; render(); });
-input.addEventListener('focus',()=>{ if(input.value){ matches=query(norm(input.value)); render(); } });
+input.addEventListener('input',()=>{ matches=queryPlaces(norm(input.value)); active=-1; render(); });
+input.addEventListener('focus',()=>{ if(input.value){ matches=queryPlaces(norm(input.value)); render(); } });
 input.addEventListener('keydown',e=>{
   if(e.key==='ArrowDown'){ e.preventDefault(); active=Math.min(active+1,matches.length-1); render(); }
   else if(e.key==='ArrowUp'){ e.preventDefault(); active=Math.max(active-1,0); render(); }
