@@ -71,22 +71,32 @@ const map = new maplibregl.Map({
 });
 map.addControl(new maplibregl.NavigationControl({visualizePitch:true}), 'bottom-right');
 
-/* ---------- Spinning globe ---------- */
-let userInteracting=false, spinEnabled=!reduce;
+/* ---------- Spinning globe (rAF-driven, never fights user input) ---------- */
+let spinEnabled=!reduce, dragging=false, lastFrame=0;
 const SECONDS_PER_REV=150, MAX_SPIN_ZOOM=5, SLOW_SPIN_ZOOM=3;
-function spinGlobe(){
-  const z=map.getZoom();
-  if(spinEnabled && !userInteracting && z<MAX_SPIN_ZOOM){
-    let dps=360/SECONDS_PER_REV;
-    if(z>SLOW_SPIN_ZOOM) dps *= (MAX_SPIN_ZOOM-z)/(MAX_SPIN_ZOOM-SLOW_SPIN_ZOOM);
-    const c=map.getCenter(); c.lng-=dps;
-    map.easeTo({center:c, duration:1000, easing:n=>n});
-  }
+const DEG_PER_SEC=360/SECONDS_PER_REV;
+
+map.on('dragstart',()=>{ dragging=true; });
+map.on('dragend',  ()=>{ dragging=false; });
+
+function spinFrame(t){
+  requestAnimationFrame(spinFrame);
+  const dt = lastFrame ? Math.min((t-lastFrame)/1000, 0.1) : 0;
+  lastFrame = t;
+  if(!spinEnabled || dragging) return;
+  // pause while ANY camera movement is happening (user gesture, inertia, zoom, flyTo)
+  if(map.isMoving() || map.isZooming() || map.isRotating()) return;
+  const z = map.getZoom();
+  if(z >= MAX_SPIN_ZOOM) return;
+  let dps = DEG_PER_SEC;
+  if(z > SLOW_SPIN_ZOOM) dps *= (MAX_SPIN_ZOOM - z)/(MAX_SPIN_ZOOM - SLOW_SPIN_ZOOM);
+  const c = map.getCenter();
+  c.lng -= dps * dt;
+  if(c.lng < -180) c.lng += 360;
+  map.setCenter(c); // instant per-frame nudge: no animation, no event recursion
 }
-['mousedown','touchstart','dragstart'].forEach(ev=>map.on(ev,()=>{userInteracting=true;}));
-['mouseup','touchend','dragend'].forEach(ev=>map.on(ev,()=>{userInteracting=false; spinGlobe();}));
-map.on('moveend', spinGlobe);
-map.on('load', ()=>{ spinGlobe(); addMarkers(); });
+
+map.on('load', ()=>{ addMarkers(); requestAnimationFrame(spinFrame); });
 
 function goTo(c){
   if(reduce) map.jumpTo({center:[c.lng,c.lat], zoom:13});
